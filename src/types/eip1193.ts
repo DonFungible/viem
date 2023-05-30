@@ -21,8 +21,8 @@ import type { Prettify } from './utils.js'
 
 export type EIP1474Methods = [...PublicRpcSchema, ...WalletRpcSchema]
 
-export type EIP1193Provider = Events & {
-  request: EIP1193RequestFn<EIP1474Methods, { Strict: false }>
+export type EIP1193Provider = EIP1193Events & {
+  request: EIP1193RequestFn<EIP1474Methods>
 }
 
 //////////////////////////////////////////////////
@@ -51,7 +51,7 @@ export type ProviderMessage = {
   data: unknown
 }
 
-export type Events = {
+export type EIP1193Events = {
   on(
     event: 'connect',
     listener: (connectInfo: ProviderConnectInfo) => void,
@@ -1194,7 +1194,7 @@ export type WalletRpcSchema = [
    */
   {
     Method: 'wallet_watchAsset'
-    Parameters: [asset: WatchAssetParams]
+    Parameters: WatchAssetParams
     ReturnType: boolean
   },
 ]
@@ -1207,14 +1207,6 @@ export type RpcSchema = readonly {
   Parameters?: unknown
   ReturnType: unknown
 }[]
-
-type NoopSchemaItem = {
-  Method: string
-  Parameters: undefined
-  ReturnType: unknown
-}
-
-export type EIP1193RequestFnConfig = { Strict: boolean }
 
 export type EIP1193Parameters<
   TRpcSchema extends RpcSchema | undefined = undefined,
@@ -1237,33 +1229,27 @@ export type EIP1193Parameters<
       params?: unknown
     }
 
+type DerivedRpcSchema<
+  TRpcSchema extends RpcSchema | undefined,
+  TRpcSchemaOverrides extends RpcSchema | undefined,
+> = TRpcSchemaOverrides extends RpcSchema ? TRpcSchemaOverrides : TRpcSchema
+
 export type EIP1193RequestFn<
   TRpcSchema extends RpcSchema | undefined = undefined,
-  TConfig extends EIP1193RequestFnConfig = { Strict: false },
 > = <
-  TMethod extends TRpcSchema extends RpcSchema
-    ? TConfig['Strict'] extends true
-      ? TRpcSchema[number]['Method']
-      : TRpcSchema[number]['Method'] | (string & {})
-    : string,
-  _SchemaItem extends RpcSchema[number] = TRpcSchema extends RpcSchema
-    ? Extract<TRpcSchema[number], { Method: TMethod }> extends never
-      ? NoopSchemaItem
-      : Extract<TRpcSchema[number], { Method: TMethod }>
-    : NoopSchemaItem,
-  _Parameters = _SchemaItem['Parameters'],
-  _ReturnType = _SchemaItem['ReturnType'],
+  TRpcSchemaOverrides extends RpcSchema | undefined = undefined,
+  TParameters extends EIP1193Parameters<
+    DerivedRpcSchema<TRpcSchema, TRpcSchemaOverrides>
+  > = EIP1193Parameters<DerivedRpcSchema<TRpcSchema, TRpcSchemaOverrides>>,
+  _ReturnType = DerivedRpcSchema<
+    TRpcSchema,
+    TRpcSchemaOverrides
+  > extends RpcSchema
+    ? Extract<
+        DerivedRpcSchema<TRpcSchema, TRpcSchemaOverrides>[number],
+        { Method: TParameters['method'] }
+      >['ReturnType']
+    : unknown,
 >(
-  args: {
-    method: TMethod
-  } & (
-    | (_Parameters extends undefined
-        ? { params?: _Parameters }
-        : { params: _Parameters })
-    | (TConfig['Strict'] extends false
-        ? TRpcSchema extends RpcSchema
-          ? never
-          : { params?: unknown }
-        : never)
-  ),
+  args: TParameters,
 ) => Promise<_ReturnType>
