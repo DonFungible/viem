@@ -453,6 +453,7 @@ export type {
   PublicRpcSchema,
   NetworkSync,
   RpcSchema,
+  RpcSchemaOverride,
   TestRpcSchema,
   WatchAssetParams,
   WalletPermissionCaveat,
